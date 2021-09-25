@@ -1,0 +1,181 @@
+---
+title: "moneyball"
+authors: "Ethan Haley / Leticia Cancel / Douglas Barley / Isabel Magnus / John Mazon / Vinayak Kamath"
+date: "9/6/2021"
+output:
+  html_document: 
+    toc: true
+    toc_depth: 4
+    number_sections: true
+    theme: united
+    highlight: tango
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#Loading additional libraries
+library(knitr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+
+library(corrplot)
+```
+
+
+```{r}
+# load data from Doug's github repo
+df <- read.csv('https://raw.githubusercontent.com/douglasbarley/DATA621/main/Homework1/moneyball-training-data.csv')
+df_eval <- read.csv('https://raw.githubusercontent.com/douglasbarley/DATA621/main/Homework1/moneyball-evaluation-data.csv') 
+str(df)
+kable(head(df))
+
+
+mydata1.cor = cor(df, df)
+kable(mydata1.cor)
+corrplot(mydata1.cor)
+```
+
+--- 
+
+# Clipping outliers and imputing missing values: 
+**We should look at using median for outliers instead of clipping**
+
+```{r}
+
+# Impute median for these
+
+df$TEAM_BASERUN_CS[is.na(df$TEAM_BASERUN_CS)] = median(df$TEAM_BASERUN_CS, na.rm=T)
+df$TEAM_BASERUN_SB[is.na(df$TEAM_BASERUN_SB)] = median(df$TEAM_BASERUN_SB, na.rm=T)
+df$TEAM_BATTING_SO[is.na(df$TEAM_BATTING_SO)] = median(df$TEAM_BATTING_SO, na.rm=T)
+df$TEAM_PITCHING_SO[is.na(df$TEAM_PITCHING_SO)] = median(df$TEAM_PITCHING_SO, na.rm=T)
+df$TEAM_FIELDING_DP[is.na(df$TEAM_FIELDING_DP)] = median(df$TEAM_FIELDING_DP, na.rm=T)
+df$TEAM_FIELDING_DP[is.na(df$TEAM_BATTING_HBP)] = median(df$TEAM_BATTING_HBP, na.rm=T)
+
+# Clip these 3  
+
+df$TEAM_PITCHING_H = sapply(df$TEAM_PITCHING_H, function(x){min(x, 5000)})
+df$TEAM_PITCHING_SO = sapply(df$TEAM_PITCHING_SO, function(x){min(x, 2500)})
+df$TEAM_PITCHING_BB = sapply(df$TEAM_PITCHING_BB, function(x){min(x, 1250)})
+
+
+# Break TEAM_BATTING_H into singles vs other hits, to avoid duplicating other hits
+singles_hit = df$TEAM_BATTING_H - df$TEAM_BATTING_2B - df$TEAM_BATTING_3B - df$TEAM_BATTING_HR
+df$TEAM_BATTING_1B = singles_hit
+
+# We only get Hits and HR for Pitching stats, so can only separate into HR vs all others
+hits_allowed = df$TEAM_PITCHING_H - df$TEAM_PITCHING_HR
+df$TEAM_PITCHING_1B2B3B = hits_allowed
+
+```
+
+
+--- 
+
+# Getting Correlated Variable Pairs for our response variable.
+
+```{r}
+# Correlation Between All Variables
+mydata.cor = cor(df$TARGET_WINS, df)
+kable(mydata.cor)
+corrplot(mydata.cor)
+
+
+
+```
+
+==> Based on above we can say that the below explanatory variables were most correlated with the response variable:
+
+- TEAM_BATTING_H	
+- TEAM_BATTING_2B
+- TEAM_BATTING_BB
+- TEAM_PITCHING_HR
+- TEAM_BATTING_1B
+
+
+
+# Model using Only Highly Correlated Variables 
+
+```{r}
+# Model using Only Highly Correlated Variables
+
+model.2 = lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_BB + TEAM_PITCHING_HR + TEAM_BATTING_1B , df)
+summary(model.2)
+```
+
+==> we notice the following:  
+- At 0.2352 , the adjusted R^2 indicates that this model explains 24% of the variance in the response variable.  
+- At 140.9, the F-statistic is larger , and the model’s p-value is near zero. If the model’s diagnostics are sufficient, these values indicate that we would reject the null hypothesis that there is no relationship between the explanatory & response variables.  
+
+```{r}
+par(mfrow=c(2,2))
+plot(model.2)
+par(mfrow=c(1,1))
+```
+
+
+# running on train and test
+
+```{r}
+# split off a validation set so we can test models on unseen data before evaluating on other provided csv file
+set.seed(621)
+shuffled = sample(1:dim(df)[1])
+train_inds = shuffled[1:1800]
+valid_inds = shuffled[1801:length(shuffled)]
+trains = df[train_inds,]
+valids = df[valid_inds,]
+
+# first linear model, using all features
+model.2.trains = lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_BB + TEAM_PITCHING_HR + TEAM_BATTING_1B , trains)
+summary(model.2.trains)
+
+# evaluate model on validation set
+model.2.preds = predict(model.2.trains, valids)
+errs = model.2.preds - valids$TARGET_WINS
+
+mse = mean((errs)^2)
+mae = mean(abs(errs))
+rmse = sqrt(mse)
+R2 = 1-(sum((errs)^2)/sum((model.2.preds-mean(model.2.preds))^2))
+
+cat(" MAE:", mae, "\n", "MSE:", mse, "\n", 
+    "RMSE:", rmse, "\n", "R-squared:", R2)
+
+
+#viewing the data
+valids$TARGET_WINS_PRED = model.2.preds
+
+kable(head(valids) )
+```
+
+
+# running on evaluation dataset
+
+```{r}
+
+# Impute median for these
+df_eval$TEAM_BASERUN_CS[is.na(df_eval$TEAM_BASERUN_CS)] = median(df_eval$TEAM_BASERUN_CS, na.rm=T)
+df_eval$TEAM_BASERUN_SB[is.na(df_eval$TEAM_BASERUN_SB)] = median(df_eval$TEAM_BASERUN_SB, na.rm=T)
+df_eval$TEAM_BATTING_SO[is.na(df_eval$TEAM_BATTING_SO)] = median(df_eval$TEAM_BATTING_SO, na.rm=T)
+df_eval$TEAM_PITCHING_SO[is.na(df_eval$TEAM_PITCHING_SO)] = median(df_eval$TEAM_PITCHING_SO, na.rm=T)
+df_eval$TEAM_FIELDING_DP[is.na(df_eval$TEAM_FIELDING_DP)] = median(df_eval$TEAM_FIELDING_DP, na.rm=T)
+df_eval$TEAM_FIELDING_DP[is.na(df_eval$TEAM_BATTING_HBP)] = median(df_eval$TEAM_BATTING_HBP, na.rm=T)
+
+
+# Break TEAM_BATTING_H into singles vs other hits, to avoid duplicating other hits
+singles_hit = df_eval$TEAM_BATTING_H - df_eval$TEAM_BATTING_2B - df_eval$TEAM_BATTING_3B - df_eval$TEAM_BATTING_HR
+df_eval$TEAM_BATTING_1B = singles_hit
+
+# We only get Hits and HR for Pitching stats, so can only separate into HR vs all others
+hits_allowed = df_eval$TEAM_PITCHING_H - df_eval$TEAM_PITCHING_HR
+df_eval$TEAM_PITCHING_1B2B3B = hits_allowed
+
+# evaluate model on validation set
+TARGET_WINS_EVALS = predict(model.2.trains, df_eval)
+df_eval$TARGET_WINS = TARGET_WINS_EVALS
+
+# viewing data
+kable(head(df_eval))
+
+```
