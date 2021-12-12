@@ -1,0 +1,319 @@
+---
+title: "Final Project - WHO Data Set"
+author: "Douglas Barley, Ethan Haley, Isabel Magnus, John Mazon, Vinayak Kamath, Arushi Arora"
+date: "11/22/2021"
+output:
+  html_document: 
+    toc: true
+    toc-title: "Final Project - WHO Data Set"
+    toc_depth: 3
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    theme: united
+    highlight: tango
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(dplyr)
+
+
+library("GGally")
+library(ggplot2)
+
+library(AER)
+
+```
+
+---  
+
+## Loading Data Set - WHO Life Expectancy Data
+---  
+
+## EDA and modeling
+
+```{r warning=FALSE}
+
+#WHO_Final <- WHO_with_Region
+WHO_URL <- "https://raw.githubusercontent.com/ebhtra/msds-621/main/FinalProject/fewerNAs.csv"
+#https://raw.githubusercontent.com/ebhtra/msds-621/main/FinalProject/finalProjDF.csv"
+WHO_Final <- read_csv(WHO_URL )
+
+# Dropping NA
+#WHO_Final <- WHO_Final %>%
+#  drop_na() 
+
+# renaming columns 
+#WHO_Final <- WHO_Final %>%
+#  rename(LifeExpectancy = "Life expectancy", AdultMortality = "Adult Mortality", InfantDeaths = "infant deaths"
+#         , IncomeComposition ="Income composition of resources")
+
+summary(WHO_Final)
+
+```    
+```{r}
+#Region Wise TotalPopulation:
+ggplot(WHO_Final, aes(Region, PopTotal, fill = Region )) + geom_col()
+
+```
+
+
+```{r warning=FALSE}
+#calculate mean of each death column
+WHO_Final %>% 
+    group_by(Status) %>% 
+    summarize(count = n(),
+             LifExpMean = mean(LEx, na.rm=TRUE),
+             DeathsMean = mean(Deaths, na.rm=TRUE),
+             InfdeaMean = mean(InfantDeaths, na.rm=TRUE)
+             )
+
+
+```
+
+
+```{r}
+#Life Expectancy and Deaths (Year 2015)
+WHO_Final_2015 <- WHO_Final[WHO_Final$Year==2015,]
+
+ggplot(WHO_Final_2015, aes(x = Deaths, y = LEx, size = PopDensity, fill = Status))+
+  geom_point(alpha = 0.75, shape = 21)+
+  scale_size(range = c(4, 20), name = "Population (in milions): ", breaks = c(1,10,50,100,1000))+
+  geom_smooth(aes(colour = Status), method = "loess", size = 1, formula = y ~ x)+
+  scale_x_continuous(limits = c(0,800))+
+  scale_y_continuous(limits = c(50,90))+
+  labs(x = "Number of people dying between 15 and 60 years (per 1000 population)", y = "Life Expectancy (in age)", title = "Life Expectancy and Deaths (Year 2015)", subtitle = "by country, status and population size", fill = "Status: ", colour = "Status: ")+
+  guides(fill = guide_legend(override.aes = list(size = 3, alpha = 1)))+
+  scale_fill_brewer(palette = "Set1")+
+  scale_colour_brewer(palette = "Set1")
+  
+```
+
+```{r}
+#Life Expectancy and schooling (Year 2015)
+WHO_Final_2015 <- WHO_Final[WHO_Final$Year==2015,]
+
+ggplot(WHO_Final_2015, aes(x = Schooling, y = LEx, size = PopDensity, fill = Status))+
+  geom_point(alpha = 0.75, shape = 21)+
+  scale_size(range = c(4, 20), name = "Schooling: ", breaks = c(1,10,50,100,1000))+
+  geom_smooth(aes(colour = Status), method = "loess", size = 1, formula = y ~ x)+
+   scale_x_continuous(limits=c(4.5,20.5))+
+  scale_y_continuous(limits=c(50,90))+
+  labs(x = "Number of people Schooling", y = "Life Expectancy (in age)", title = "Life Expectancy and Schooling (Year 2015)", subtitle = "by country, status and population size", fill = "Status: ", colour = "Status: ")+
+  guides(fill = guide_legend(override.aes = list(size = 3, alpha = 1)))+
+  scale_fill_brewer(palette = "Set1")+
+  scale_colour_brewer(palette = "Set1")
+  
+```
+
+```{r warning=FALSE}
+#Correlation between variables
+
+#Region=='South Asia'
+WHO_Final_Numeric <- WHO_Final %>% 
+  filter( Region=='South Asia') %>%
+  select_if(is.numeric)
+
+
+WHO_Final_Numeric <-  WHO_Final_Numeric %>%
+  select(LEx, StillBirthRate, PctHealthExp, Deaths, Births, PopDensity, Schooling
+         , IncomeComposition, `thinness 5-9 years`, `HIV/AIDS` , Diphtheria
+         , `Total expenditure`, Polio, `under-five deaths`, Measles, Alcohol
+         , InfantDeaths, Year)
+
+ggcorr(WHO_Final_Numeric, 
+       label = T, 
+       label_size = 2,
+       label_round = 2,
+       hjust = 1,
+       size = 3, 
+       color = "royalblue",
+       layout.exp = 5,
+       low = "darkorange", 
+       mid = "gray95", 
+       high = "darkgreen",
+       name = "Correlation")
+
+lm.region <- lm(formula = LEx ~ . , data = WHO_Final_Numeric)
+summary(lm.region)
+
+lm.region <- lm(formula = LEx ~ Schooling + Diphtheria , data = WHO_Final_Numeric )
+summary(lm.region)
+
+
+#Region=='Europe & Central Asia'
+WHO_Final_Numeric <- WHO_Final %>% 
+  filter( Region=='Europe & Central Asia') %>% 
+  select_if(is.numeric)
+
+ggcorr(WHO_Final_Numeric, 
+       label = T, 
+       label_size = 2,
+       label_round = 2,
+       hjust = 1,
+       size = 3, 
+       color = "royalblue",
+       layout.exp = 5,
+       low = "darkorange", 
+       mid = "gray95", 
+       high = "darkgreen",
+       name = "Correlation")
+
+lm.region <- lm(formula = LEx ~ . , data = WHO_Final_Numeric)
+summary(lm.region)
+
+
+#Region=='East Asia & Pacific'
+WHO_Final_Numeric <- WHO_Final %>% 
+  filter( Region=='East Asia & Pacific') %>% 
+  select_if(is.numeric)
+  
+ggcorr(WHO_Final_Numeric, 
+       label = T, 
+       label_size = 2,
+       label_round = 2,
+       hjust = 1,
+       size = 3, 
+       color = "royalblue",
+       layout.exp = 5,
+       low = "darkorange", 
+       mid = "gray95", 
+       high = "darkgreen",
+       name = "Correlation")
+
+lm.region <- lm(formula = LEx ~ . , data = WHO_Final_Numeric)
+summary(lm.region)
+
+
+#Region=='Middle East & North Africa'
+WHO_Final_Numeric <- WHO_Final %>% 
+  filter( Region=='Middle East & North Africa') %>% 
+  select_if(is.numeric)
+
+ggcorr(WHO_Final_Numeric, 
+       label = T, 
+       label_size = 2,
+       label_round = 2,
+       hjust = 1,
+       size = 3, 
+       color = "royalblue",
+       layout.exp = 5,
+       low = "darkorange", 
+       mid = "gray95", 
+       high = "darkgreen",
+       name = "Correlation")
+
+lm.region <- lm(formula = LEx ~ . , data = WHO_Final_Numeric)
+summary(lm.region)
+
+```
+
+---
+
+## Time Series Analysis
+
+```{r warning=FALSE}
+ 
+
+# subset the data
+WHO_Final_RegionSA <- subset(WHO_Final, Region=='South Asia')
+
+WHO_Final_RegionSA2000 <- subset(WHO_Final_RegionSA, Year == "2000")
+WHO_Final_RegionSA2015 <- subset(WHO_Final_RegionSA, Year == "2015")
+
+# estimate simple regression models using 1982 and 1988 data
+who2000_mod <- lm(LEx ~ Schooling, data = WHO_Final_RegionSA2000)
+who2015_mod <- lm(LEx ~ Schooling, data = WHO_Final_RegionSA2015)
+
+
+coeftest(who2000_mod, vcov. = vcovHC, type = "HC1")
+coeftest(who2015_mod, vcov. = vcovHC, type = "HC1")
+
+```
+
+```{r}
+# plot the observations and add the estimated regression line for 2000 data
+plot(x = WHO_Final_RegionSA2000$Schooling, 
+     y = WHO_Final_RegionSA2000$LEx, 
+     xlab = "Schooling  (in 2000)",
+     ylab = "Life Expectancy (in 2000)",
+     main = "Schooling and Life Expectancy in 2000",
+     #ylim = c(0, 4.5),
+     pch = 20, 
+     col = "steelblue")
+
+abline(who2000_mod, lwd = 1.5)
+```
+
+```{r}
+# plot the observations and add the estimated regression line for 2015 data
+plot(x = WHO_Final_RegionSA2015$Schooling, 
+     y = WHO_Final_RegionSA2015$LEx, 
+     xlab = "Schooling (in 2015)",
+     ylab = "Life Expectancy (in 2015)",
+     main = "Schooling and Life Expectancy in 2015",
+     #ylim = c(0, 4.5),
+     pch = 20, 
+     col = "steelblue")
+
+abline(who2015_mod, lwd = 1.5)
+```
+
+```{r}
+# compute the differences 
+diff_LEx <- WHO_Final_RegionSA2015$LEx - WHO_Final_RegionSA2000$LEx
+diff_Schooling <- WHO_Final_RegionSA2015$Schooling - WHO_Final_RegionSA2000$Schooling
+
+# estimate a regression using differenced data
+who_diff_mod <- lm(diff_LEx ~ diff_Schooling)
+
+coeftest(who_diff_mod, vcov = vcovHC, type = "HC1")
+
+
+# plot the differenced data
+plot(x = diff_Schooling, 
+     y = diff_LEx, 
+     xlab = "Change in Schooling (in 2015 )",
+     ylab = "Change in Life Expectancy (in 2015)",
+     main = "Changes in Life Expectancy and Schooling in 2000-2015",
+     pch = 20, 
+     col = "steelblue")
+
+# add the regression line to plot
+abline(who_diff_mod, lwd = 1.5)
+```
+
+```{r warning=FALSE}
+#Correlation between variables
+
+#Region=='South Asia'
+WHO_Final_Numeric <- WHO_Final %>% 
+  filter( Region=='Sub-Saharan Africa') %>%
+  select_if(is.numeric)
+
+ggcorr(WHO_Final_Numeric, 
+       label = T, 
+       label_size = 2,
+       label_round = 2,
+       hjust = 1,
+       size = 3, 
+       color = "royalblue",
+       layout.exp = 5,
+       low = "darkorange", 
+       mid = "gray95", 
+       high = "darkgreen",
+       name = "Correlation")
+
+plot(x = WHO_Final_Numeric$"HIV/AIDS", 
+     y = WHO_Final_Numeric$LEx, 
+     xlab = "Schooling (in 2015)",
+     ylab = "Life Expectancy (in 2015)",
+     main = "Schooling and Life Expectancy in 2015",
+     #ylim = c(0, 4.5),
+     pch = 20, 
+     col = "steelblue")
+
+```
+---  
