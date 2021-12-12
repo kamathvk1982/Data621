@@ -54,8 +54,11 @@ summary(WHO_Final)
 
 ```    
 ```{r}
-#Region Wise TotalPopulation:
-ggplot(WHO_Final, aes(Region, PopTotal, fill = Region )) + geom_col()
+
+#Region Wise Total Population for year 2015:
+WHO_Final_2015 <- WHO_Final[WHO_Final$Year==2015,]
+
+ggplot(WHO_Final_2015, aes(Region, PopTotal, fill = Region )) + geom_col()
 
 ```
 
@@ -97,7 +100,7 @@ WHO_Final_2015 <- WHO_Final[WHO_Final$Year==2015,]
 
 ggplot(WHO_Final_2015, aes(x = Schooling, y = LEx, size = PopDensity, fill = Status))+
   geom_point(alpha = 0.75, shape = 21)+
-  scale_size(range = c(4, 20), name = "Schooling: ", breaks = c(1,10,50,100,1000))+
+  scale_size(range = c(4, 20), name = "Population (in milions): ", breaks = c(1,10,50,100,1000))+
   geom_smooth(aes(colour = Status), method = "loess", size = 1, formula = y ~ x)+
    scale_x_continuous(limits=c(4.5,20.5))+
   scale_y_continuous(limits=c(50,90))+
